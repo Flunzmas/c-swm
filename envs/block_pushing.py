@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image
 
-
 import skimage
+from skimage import draw
 
 
 def square(r0, c0, width, im_size):
@@ -206,4 +206,4 @@ class BlockPushing(gym.Env):
 
         state_obs = (self.get_state(), self.render())
 
-        return state_obs, reward, done, None
+        return state_obs, reward, done, {}
