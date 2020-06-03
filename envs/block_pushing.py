@@ -13,8 +13,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image
 
-import skimage
-from skimage import draw
+import skimage.draw
 
 
 def square(r0, c0, width, im_size):
