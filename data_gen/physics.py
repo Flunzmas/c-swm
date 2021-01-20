@@ -10,6 +10,7 @@ import argparse
 
 from utils import save_list_dict_h5py
 
+default_img_size = (64, 64)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--fname', type=str,
@@ -21,6 +22,8 @@ parser.add_argument('--seed', type=int, default=0,
                     help='Random seed.')
 parser.add_argument('--eval', action='store_true', default=False,
                     help='Create evaluation set.')
+parser.add_argument('--img-size', dest='img_size', default=default_img_size,
+                    help='size of observation images in final data set')
 
 args = parser.parse_args()
 
@@ -32,7 +35,7 @@ physics_sim.generate_3_body_problem_dataset(
     valid_set_size=2,
     test_set_size=2,
     seq_len=12,
-    img_size=[64, 64],
+    img_size=list(args.img_size),
     dt=2.0,
     vx0_max=0.5,
     vy0_max=0.5,

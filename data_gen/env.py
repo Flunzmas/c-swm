@@ -35,14 +35,13 @@ class RandomAgent(object):
         del observation, reward, done
         return self.action_space.sample()
 
-img_size = (64, 64)
 
-def crop_normalize(img, crop_ratio):
+def crop_normalize(img, crop_ratio, img_size):
     img = img[crop_ratio[0]:crop_ratio[1]]
     img = Image.fromarray(img).resize(img_size, Image.ANTIALIAS)
     return np.transpose(np.array(img), (2, 0, 1)) / 255
 
-def non_atari_resize(img : np.ndarray):
+def non_atari_resize(img : np.ndarray, img_size):
     img = (img * 255).astype(np.uint8).transpose((1, 2, 0))
     img = Image.fromarray(img).resize(img_size, Image.ANTIALIAS)
     return np.transpose(np.array(img), (2, 0, 1)) / 255
@@ -62,6 +61,8 @@ if __name__ == '__main__':
     parser.add_argument('--no-atari-concat', dest='no_atari_concat',
                         action='store_true', default=False,
                         help='do not concat atari images for obs')
+    parser.add_argument('--img-size', dest='img_size', default=(64, 64),
+                        help='size of observation images in final data set')
     args = parser.parse_args()
 
     logger.set_level(logger.INFO)
@@ -111,9 +112,9 @@ if __name__ == '__main__':
             for _ in range(warmstart):
                 action = agent.act(ob, reward, done)
                 ob, _, _, _ = env.step(action)
-            prev_ob = crop_normalize(ob, crop)
+            prev_ob = crop_normalize(ob, crop, args.img_size)
             ob, _, _, _ = env.step(0)
-            ob = crop_normalize(ob, crop)
+            ob = crop_normalize(ob, crop, args.img_size)
 
         while True:
             if args.atari:
@@ -124,7 +125,7 @@ if __name__ == '__main__':
                         .append(np.concatenate((ob, prev_ob), axis=0))
                 prev_ob = ob
             else:
-                replay_buffer[i]['obs'].append(non_atari_resize(ob[1]))
+                replay_buffer[i]['obs'].append(non_atari_resize(ob[1], args.img_size))
 
             action = agent.act(ob, reward, done)
             ob, reward, done, _ = env.step(action)
@@ -135,14 +136,14 @@ if __name__ == '__main__':
 
             if save_next_obs:
                 if args.atari:
-                    ob = crop_normalize(ob, crop)
+                    ob = crop_normalize(ob, crop, args.img_size)
                     if args.no_atari_concat:
                         replay_buffer[i]['next_obs'].append(ob)
                     else:
                         replay_buffer[i]['next_obs'].append(
                             np.concatenate((ob, prev_ob), axis=0))
                 else:
-                    replay_buffer[i]['next_obs'].append(non_atari_resize(ob[1]))
+                    replay_buffer[i]['next_obs'].append(non_atari_resize(ob[1], args.img_size))
 
             if done:
                 break
