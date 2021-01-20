@@ -1,3 +1,9 @@
+# Get env directory
+import sys
+from pathlib import Path
+if str(Path.cwd()) not in sys.path:
+    sys.path.insert(0, str(Path.cwd()))
+
 from envs import physics_sim
 import numpy as np
 import argparse
@@ -26,7 +32,7 @@ physics_sim.generate_3_body_problem_dataset(
     valid_set_size=2,
     test_set_size=2,
     seq_len=12,
-    img_size=[50, 50],
+    img_size=[64, 64],
     dt=2.0,
     vx0_max=0.5,
     vy0_max=0.5,

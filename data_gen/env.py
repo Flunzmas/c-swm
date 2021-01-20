@@ -7,6 +7,7 @@ experience in a replay buffer.
 # Get env directory
 import sys
 from pathlib import Path
+
 if str(Path.cwd()) not in sys.path:
     sys.path.insert(0, str(Path.cwd()))
 
@@ -34,12 +35,17 @@ class RandomAgent(object):
         del observation, reward, done
         return self.action_space.sample()
 
+img_size = (64, 64)
 
 def crop_normalize(img, crop_ratio):
     img = img[crop_ratio[0]:crop_ratio[1]]
-    img = Image.fromarray(img).resize((50, 50), Image.ANTIALIAS)
+    img = Image.fromarray(img).resize(img_size, Image.ANTIALIAS)
     return np.transpose(np.array(img), (2, 0, 1)) / 255
 
+def non_atari_resize(img : np.ndarray):
+    img = (img * 255).astype(np.uint8).transpose((1, 2, 0))
+    img = Image.fromarray(img).resize(img_size, Image.ANTIALIAS)
+    return np.transpose(np.array(img), (2, 0, 1)) / 255
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=None)
@@ -53,6 +59,9 @@ if __name__ == '__main__':
                         help='Run atari mode (stack multiple frames).')
     parser.add_argument('--seed', type=int, default=1,
                         help='Random seed.')
+    parser.add_argument('--no-atari-concat', dest='no_atari_concat',
+                        action='store_true', default=False,
+                        help='do not concat atari images for obs')
     args = parser.parse_args()
 
     logger.set_level(logger.INFO)
@@ -88,10 +97,14 @@ if __name__ == '__main__':
         replay_buffer.append({
             'obs': [],
             'action': [],
+            'reward': [],
+            'done': [],
             'next_obs': [],
         })
+        save_next_obs = 'next_obs' in replay_buffer[-1].keys()
 
         ob = env.reset()
+        prev_ob = None
 
         if args.atari:
             # Burn-in steps
@@ -102,40 +115,42 @@ if __name__ == '__main__':
             ob, _, _, _ = env.step(0)
             ob = crop_normalize(ob, crop)
 
-            while True:
-                replay_buffer[i]['obs'].append(
-                    np.concatenate((ob, prev_ob), axis=0))
+        while True:
+            if args.atari:
+                if args.no_atari_concat:
+                    replay_buffer[i]['obs'].append(ob)
+                else:
+                    replay_buffer[i]['obs']\
+                        .append(np.concatenate((ob, prev_ob), axis=0))
                 prev_ob = ob
+            else:
+                replay_buffer[i]['obs'].append(non_atari_resize(ob[1]))
 
-                action = agent.act(ob, reward, done)
-                ob, reward, done, _ = env.step(action)
-                ob = crop_normalize(ob, crop)
+            action = agent.act(ob, reward, done)
+            ob, reward, done, _ = env.step(action)
 
-                replay_buffer[i]['action'].append(action)
-                replay_buffer[i]['next_obs'].append(
-                    np.concatenate((ob, prev_ob), axis=0))
+            replay_buffer[i]['action'].append(action)
+            replay_buffer[i]['reward'].append(reward)
+            replay_buffer[i]['done'].append(done)
 
-                if done:
-                    break
-        else:
+            if save_next_obs:
+                if args.atari:
+                    ob = crop_normalize(ob, crop)
+                    if args.no_atari_concat:
+                        replay_buffer[i]['next_obs'].append(ob)
+                    else:
+                        replay_buffer[i]['next_obs'].append(
+                            np.concatenate((ob, prev_ob), axis=0))
+                else:
+                    replay_buffer[i]['next_obs'].append(non_atari_resize(ob[1]))
 
-            while True:
-                replay_buffer[i]['obs'].append(ob[1])
-
-                action = agent.act(ob, reward, done)
-                ob, reward, done, _ = env.step(action)
-
-                replay_buffer[i]['action'].append(action)
-                replay_buffer[i]['next_obs'].append(ob[1])
-
-                if done:
-                    break
+            if done:
+                break
 
         if i % 10 == 0:
-            print("iter "+str(i))
+            print("iter " + str(i))
 
     env.close()
 
     # Save replay buffer to disk.
     utils.save_list_dict_h5py(replay_buffer, args.fname)
-
